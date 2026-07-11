@@ -561,14 +561,25 @@ if mode == "🌍 總經戰情室":
 if mode == "🔍 個股深度分析" and run_btn and ticker:
     with st.spinner("啟動底層特徵引擎與 Agent 辯論中..."):
         # AI Decision Pipeline 流水線執行
-        df = DataEngine.get_stock_data(ticker, use_cache=use_cache)
-        df = IndicatorEngine.add_indicators(df)
-        df = StructureEngine.add_swing_points(df)
-        df = RiskEngine.add_risk_metrics(df)
-        df = DivergenceEngine.add_defense_signals(df)
-        df = StrategyEngine.generate_signals(df)
-        df = MomentumEngine.add_momentum_score(df)
-        df = EvidenceEngine.add_evidence(df)
+        # ⚠️ 修正說明：這段原本完全沒有 try/except。DataEngine.get_stock_data()
+        # 依設計會在查無資料時主動 raise Exception（見 data_engine.py），
+        # 例如代碼打錯、興櫃股票資料覆蓋率低、網路不穩或yfinance暫時異常
+        # 都會觸發——原本這個例外會直接讓整個 Streamlit 頁面顯示一坨原始
+        # Python traceback崩潰，而不是友善的錯誤訊息。現在包起來，失敗時
+        # 顯示清楚的錯誤原因並用 st.stop() 乾淨地中止這次執行，不影響
+        # 使用者下次操作。
+        try:
+            df = DataEngine.get_stock_data(ticker, use_cache=use_cache)
+            df = IndicatorEngine.add_indicators(df)
+            df = StructureEngine.add_swing_points(df)
+            df = RiskEngine.add_risk_metrics(df)
+            df = DivergenceEngine.add_defense_signals(df)
+            df = StrategyEngine.generate_signals(df)
+            df = MomentumEngine.add_momentum_score(df)
+            df = EvidenceEngine.add_evidence(df)
+        except Exception as e:
+            st.error(f"⚠️ 無法取得或處理「{ticker}」的股價資料：{e}")
+            st.stop()
 
         # ==========================================
         # 終極防禦工程：欄位對齊與安全檢查 (避免 KeyError)
@@ -1168,6 +1179,32 @@ if mode == "🔍 個股深度分析" and run_btn and ticker:
                         st.line_chart(trend.set_index("date")["large_holder_pct"])
                     else:
                         st.caption("ℹ️ 目前只有本次查詢的單一筆記錄，趨勢圖需要多次（跨週）查詢後才會累積出來。")
+
+        with st.expander("🏛️ 董監事／大股東持股與設質分析 — 資料源：證交所董監持股開放資料，僅支援上市股票"):
+            st.caption(
+                "⚠️ 只支援上市股票（上櫃另有不同資料檔案，尚未驗證，暫不支援），每月更新一次，"
+                "反映申報當下持股，不是即時資料；設質比例高不代表一定有問題，需搭配其他資訊綜合判斷，不構成投資建議。"
+            )
+            if st.button("🏛️ 查詢董監事持股與設質狀況（抓取證交所開放資料）", key="insider_btn"):
+                with st.spinner("下載並解析董監事持股資料中（全市場單一檔案，第一次查詢較慢）..."):
+                    st.session_state["insider_report"] = ChipEngine.get_insider_holdings(ticker)
+
+            insider_report = st.session_state.get("insider_report")
+            if insider_report:
+                if insider_report.get("status") != "ok":
+                    st.warning(insider_report.get("message", "⚠️ 董監事持股資料暫時無法使用。"))
+                else:
+                    in_col1, in_col2 = st.columns(2)
+                    in_col1.metric("資料年月", insider_report["data_month"])
+                    in_col2.metric("設質比例（個人/關係人較高者）", f"{insider_report['max_pledge_pct']}%")
+
+                    st.dataframe(insider_report["detail"], use_container_width=True, hide_index=True)
+                    for f in insider_report["flags"]:
+                        st.markdown(f"- {f}")
+
+                    if not insider_report["high_pledge_table"].empty:
+                        st.markdown("**⚠️ 個人設質比例超過50%的內部人**")
+                        st.dataframe(insider_report["high_pledge_table"], use_container_width=True, hide_index=True)
 
         with st.expander("📅 季節循環分析 (Seasonality) — 需額外抓取10年歷史資料，點擊展開後執行"):
             st.caption(
