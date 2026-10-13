@@ -1,0 +1,17 @@
+TQAI Pro Enterprise v2.9.13 — BUILD MANIFEST
+Build date: 2026-10-14 (Asia/Taipei)
+Base: previous v2.9.12 complete replacement package
+Package scope: full project source, local SQLite DB, research inputs/outputs, tests, docs, Windows launch/test scripts
+Python compile check: PASS (`python -m compileall -q .`)
+Pytest: PASS (89 passed)
+Data-health report CLI: PASS; bundled data status STALE
+Bundled price rows: 12,227; tickers: 25; latest price date: 2026-07-31
+Per-ticker stale count: 25
+Stock directory: 0 rows
+Shareholding snapshot history: 0 rows
+Breakout event dataset: 186 unique events / 24 tickers / 2024-12-06 through 2026-07-23
+ETF classification on breakout events: 186 UNKNOWN (not confirmed non-ETF)
+New protections: per-ticker freshness, future-dated price warnings, duplicate price-key checks, required schema checks, decision freshness gate, intraday-estimate gate, Phase B label end dates, Phase D purging, Benjamini-Hochberg FDR, nullable ETF parsing
+Golden regression: NOT RUN successfully; tests/golden/raw has no frozen .parquet inputs
+Streamlit browser smoke test: NOT RUN; Streamlit not installed in build environment
+Live data synchronization and out-of-sample predictive performance: NOT VERIFIED
